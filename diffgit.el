@@ -92,6 +92,7 @@
        :command command
        :connection-type nil
        :sentinel (lambda (p _m)
+                   ;; TODO: buffer content width is strange
                    (when (eq 0 (process-exit-status p))
                      (diffgit-colorize-output p)
                      (pop-to-buffer diffgit-buffer)
@@ -100,6 +101,7 @@
        ))))
 
 (defun diffgit-gen-work-tree-diff ()
+  ;; TODO: Not consider non git repo condition
   "Run difft to get diff of work tree."
   (interactive)
   (let (command)

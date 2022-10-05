@@ -44,3 +44,9 @@ Diffgit provide with two commands to invoke diffstatic in a git repo:
 
 * `diffgit-gen-work-tree-diff`: show work tree diff
 * `diffgit-gen-diff-by-commit`: show diff of a specific commit in Git
+
+#### Guess commit at point
+
+Input commit hash every time when we call `diffgit-gen-diff-by-commit` can be annoying. So `diffgit` provide a simple way to get hash code of one certain commit, with which to generate diffs in that specific commit. For example:
+
+![guessCommit](./assets/guessCommit.gif)
