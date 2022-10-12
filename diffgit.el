@@ -27,7 +27,7 @@
   (run-hooks 'diffgit-mode-hook))
 
 (defgroup diffgit nil
-  "Git diff using diffstatic"
+  "Git diff using diffstatic."
   :group 'diffgit)
 
 (defcustom diffgit-buffer "*diffgit*"
@@ -45,27 +45,34 @@
   :type 'hook
   :group 'diffgit)
 
-(defun diffgit-create-or-erase-buffer ()
-  "Erase or create buffer for result display."
-  (if (get-buffer diffgit-buffer)
-      (with-current-buffer diffgit-buffer
+(defun diffgit-create-or-erase-buffer (is-tmp)
+  "Erase or create buffer for result display.
+While IS-TMP is non-nil use then target buffer is diffgit-tmp-buffer"
+  (let ((target-buffer (if is-tmp
+                           diffgit-tmp-buffer
+                         diffgit-buffer)))
+    (if (get-buffer target-buffer)
+      (with-current-buffer target-buffer
         (let ((inhibit-read-only t))
           ;; Switch to `diffgit-mode' first, otherwise `erase-buffer' will cause "save-excursion: end of buffer" error.
           (diffgit-mode)
           ;; Erase buffer content
           (read-only-mode -1)
           (erase-buffer)))
-    (generate-new-buffer diffgit-buffer)))
+    (generate-new-buffer target-buffer))))
 
 (defun diffgit-build-command (&optional commit)
-  "Build command for invoing difftastic through git."
+  "Build command for invoing difftastic through git.
+COMMIT for specific commit diff."
   (if (not commit)
-      (list "git" "difftool")
-    (list "git" "difftool" (concat commit "^.." commit)))
+      (list "git" "--no-pager" "diff" "--ext-diff")
+    (list "git" "--no-pager" "diff" "--ext-diff" (concat commit "^.." commit)))
   )
 
-(defun diffgit-colorize-output (proc)
-  "Colorize terminal output based on user config, `PROC' is the difft program run by git."
+;; Utils
+(defun diffgit--colorize-output (proc)
+  "Colorize terminal output based on user config.
+PROC is the difft program run by git."
   (if (require 'xterm-color nil 'noerror)
       (let ((inhibit-read-only t))
         (message "using xterm-color")
@@ -76,29 +83,38 @@
       (with-current-buffer (process-buffer proc)
         (ansi-color-apply-on-region (point-min) (point-max))))))
 
-(defun git-diff-guess-commit-at-point ()
+(defun diffgit--guess-commit-at-point ()
   "Try guess commit at point."
   (thing-at-point 'word))
 
+(defun diffgit--parse-diff-output (buffer)
+  "Parse difftastic output into Lisp object.
+BUFFER with the content."
+
+  )
+
+;;; Main apis
 (defun diffgit-gen-diff (command)
-  "Run difft and get output."
-  (let ((inhibit-read-only t))
-    (diffgit-create-or-erase-buffer)
+  "Run difft and get output with COMMAND."
+  (let ((inhibit-read-only t)
+        (res-list nil))
+    (diffgit-create-or-erase-buffer t)
     ;; run command
-    (with-current-buffer diffgit-buffer
+    (with-current-buffer diffgit-tmp-buffer
       (make-process
        :name "diffgit"
-       :buffer diffgit-buffer
+       :buffer diffgit-tmp-buffer
        :command command
        :connection-type nil
        :sentinel (lambda (p _m)
                    ;; TODO: buffer content width is strange
                    (when (eq 0 (process-exit-status p))
-                     (diffgit-colorize-output p)
-                     (pop-to-buffer diffgit-buffer)
+                     (diffgit--colorize-output p)
+                     (pop-to-buffer diffgit-tmp-buffer)
                      (goto-char (point-min))
-                     (read-only-mode t)))
-       ))))
+                     (read-only-mode t)
+                     (split-string (setq res-list (buffer-string)) "\n\n")
+                     (with-current-buffer "*scratch*" (insert res-list))))))))
 
 (defun diffgit-gen-work-tree-diff ()
   ;; TODO: Not consider non git repo condition
@@ -115,7 +131,7 @@
   (let (commit command)
     (setq commit (read-string "Enter commit hash or skip:"))
     (if (eq (length commit) 0)
-        (setq commit (git-diff-guess-commit-at-point)))
+        (setq commit (diffgit--guess-commit-at-point)))
     (setq command (diffgit-build-command commit))
     (diffgit-gen-diff command)))
 
