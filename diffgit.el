@@ -97,24 +97,28 @@ BUFFER with the content."
 (defun diffgit-gen-diff (command)
   "Run difft and get output with COMMAND."
   (let ((inhibit-read-only t)
-        (res-list nil))
-    (diffgit-create-or-erase-buffer t)
+        (res-list nil)
+        ;; Need to set GIT_EXTERNAL_DIFF with frame width or content column will be strange.
+        ;;
+        ;; See https://tsdh.org/posts/2022-08-01-difftastic-diffing-with-magit.html for more info.
+        (process-environment
+         (cons (concat "GIT_EXTERNAL_DIFF=difft --width="
+                       (number-to-string (frame-width)))
+               process-environment)))
+    (diffgit-create-or-erase-buffer nil)
     ;; run command
-    (with-current-buffer diffgit-tmp-buffer
+    (with-current-buffer diffgit-buffer
       (make-process
        :name "diffgit"
-       :buffer diffgit-tmp-buffer
+       :buffer diffgit-buffer
        :command command
        :connection-type nil
        :sentinel (lambda (p _m)
-                   ;; TODO: buffer content width is strange
                    (when (eq 0 (process-exit-status p))
                      (diffgit--colorize-output p)
-                     (pop-to-buffer diffgit-tmp-buffer)
                      (goto-char (point-min))
                      (read-only-mode t)
-                     (split-string (setq res-list (buffer-string)) "\n\n")
-                     (with-current-buffer "*scratch*" (insert res-list))))))))
+                     (pop-to-buffer diffgit-buffer)))))))
 
 (defun diffgit-gen-work-tree-diff ()
   ;; TODO: Not consider non git repo condition
