@@ -61,15 +61,20 @@ While IS-TMP is non-nil use then target buffer is diffgit-tmp-buffer"
           (erase-buffer)))
     (generate-new-buffer target-buffer))))
 
-(defun diffgit-build-command (&optional commit)
+(defun diffgit--build-command (&optional commit)
   "Build command for invoing difftastic through git.
 COMMIT for specific commit diff."
   (if (not commit)
       (list "git" "--no-pager" "diff" "--ext-diff")
-    (list "git" "--no-pager" "diff" "--ext-diff" (concat commit "^.." commit)))
-  )
+    (list "git" "--no-pager" "diff" "--ext-diff" (concat commit "^.." commit))))
 
 ;; Utils
+(defun diffgit--git-repo-p ()
+  "Return t if is in a Git repository."
+  (let (root-dir (vc-root-dir))
+    (or (file-regular-p (expand-file-name ".git" root-dir))
+        (file-directory-p (expand-file-name ".git" root-dir)))))
+
 (defun diffgit--colorize-output (proc)
   "Colorize terminal output based on user config.
 PROC is the difft program run by git."
@@ -121,22 +126,24 @@ BUFFER with the content."
                      (pop-to-buffer diffgit-buffer)))))))
 
 (defun diffgit-gen-work-tree-diff ()
-  ;; TODO: Not consider non git repo condition
   "Run difft to get diff of work tree."
   (interactive)
   (let (command)
-    (setq command (diffgit-build-command))
+    (if (not (diffgit--git-repo-p))
+        (user-error "No in a git repo, please check!"))
+    (setq command (diffgit--build-command))
     (diffgit-gen-diff command)))
 
 (defun diffgit-gen-diff-by-commit ()
   "Run difft through by commit."
   (interactive)
-  ;; TODO: Not consider non git repo condition
   (let (commit command)
+    (if (not (diffgit--git-repo-p))
+        (user-error "No in a git repo, please check!"))
     (setq commit (read-string "Enter commit hash or skip:"))
     (if (eq (length commit) 0)
         (setq commit (diffgit--guess-commit-at-point)))
-    (setq command (diffgit-build-command commit))
+    (setq command (diffgit--build-command commit))
     (diffgit-gen-diff command)))
 
 (provide 'diffgit)
